@@ -1,0 +1,45 @@
+version: "1.0"
+name: nocodb
+description: NocoDB backed by Hostess-managed Postgres and Redis.
+
+services:
+  db:
+    type: postgres
+    retention: permanent
+    resources:
+      preset: large
+      storage: 50Gi
+    backups:
+      schedule: daily
+      retention: 14
+
+  cache:
+    type: redis
+    retention: ephemeral
+    resources: small
+
+  nocodb:
+    type: custom
+    image: nocodb/nocodb:latest
+    depends_on:
+      - db
+      - cache
+    public: true
+    resources: large
+    retention: permanent
+    env:
+      PORT: "8080"
+      NC_PUBLIC_URL: ${nocodb.external_url}
+      NUXT_PUBLIC_NC_BACKEND_URL: ${nocodb.external_url}
+
+      DATABASE_URL: ${db.url}
+      NC_AUTH_JWT_SECRET: ${secret:NOCODB_AUTH_JWT_SECRET}
+      NC_CONNECTION_ENCRYPT_KEY: ${secret:NOCODB_CONNECTION_ENCRYPT_KEY}
+
+      NC_REDIS_URL: ${cache.url}
+      NC_TOOL_DIR: /data
+
+      NC_ADMIN_EMAIL: ${secret:NOCODB_ADMIN_EMAIL}
+      NC_ADMIN_PASSWORD: ${secret:NOCODB_ADMIN_PASSWORD}
+
+      NC_DISABLE_TELE: "true"

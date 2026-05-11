@@ -1,0 +1,125 @@
+name: flowise
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-flowise}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  garage:
+    image: dxflrs/garage:v2.2.0
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - |
+        set -eu
+
+        : "$${GARAGE_RPC_SECRET:?GARAGE_RPC_SECRET is required}"
+        : "$${GARAGE_ADMIN_TOKEN:?GARAGE_ADMIN_TOKEN is required}"
+        : "$${GARAGE_METRICS_TOKEN:?GARAGE_METRICS_TOKEN is required}"
+        : "$${GARAGE_DEFAULT_ACCESS_KEY:?GARAGE_DEFAULT_ACCESS_KEY is required}"
+        : "$${GARAGE_DEFAULT_SECRET_KEY:?GARAGE_DEFAULT_SECRET_KEY is required}"
+        : "$${GARAGE_DEFAULT_BUCKET:?GARAGE_DEFAULT_BUCKET is required}"
+
+        mkdir -p /data/meta /data/data
+
+        cat >/etc/garage.toml <<EOF
+        metadata_dir = "/data/meta"
+        data_dir = "/data/data"
+        db_engine = "sqlite"
+        replication_factor = 1
+        rpc_bind_addr = "[::]:3901"
+        rpc_public_addr = "127.0.0.1:3901"
+        rpc_secret = "$${GARAGE_RPC_SECRET}"
+
+        [s3_api]
+        s3_region = "$${GARAGE_S3_REGION:-garage}"
+        api_bind_addr = "[::]:3900"
+        root_domain = ".s3.garage.localhost"
+
+        [s3_web]
+        bind_addr = "[::]:3902"
+        root_domain = ".web.garage.localhost"
+
+        [admin]
+        api_bind_addr = "[::]:3903"
+        admin_token = "$${GARAGE_ADMIN_TOKEN}"
+        metrics_token = "$${GARAGE_METRICS_TOKEN}"
+        EOF
+
+        export GARAGE_CONFIG_FILE=/etc/garage.toml
+
+        exec /garage server --single-node --default-bucket
+    ports:
+      - "${GARAGE_S3_PORT:-3900}:3900"
+    volumes:
+      - garage-data:/data
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:-flowise-garage-rpc-secret-32-bytes}
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:-flowise-garage-admin-token}
+      GARAGE_METRICS_TOKEN: ${GARAGE_METRICS_TOKEN:-flowise-garage-metrics-token}
+      GARAGE_S3_REGION: garage
+      GARAGE_DEFAULT_BUCKET: flowise
+      GARAGE_DEFAULT_ACCESS_KEY: ${FLOWISE_S3_ACCESS_KEY_ID:-flowise}
+      GARAGE_DEFAULT_SECRET_KEY: ${FLOWISE_S3_SECRET_ACCESS_KEY:-flowise-secret}
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  flowise:
+    image: flowiseai/flowise:latest
+    depends_on:
+      db:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+    ports:
+      - "${FLOWISE_PORT:-3000}:3000"
+    volumes:
+      - flowise-data:/data
+    environment:
+      PORT: "3000"
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      FLOWISE_USERNAME: ${FLOWISE_USERNAME:-admin}
+      FLOWISE_PASSWORD: ${FLOWISE_PASSWORD:-flowise}
+      JWT_AUTH_TOKEN_SECRET: ${FLOWISE_JWT_AUTH_TOKEN_SECRET:-flowise-local-auth-token-secret}
+      JWT_REFRESH_TOKEN_SECRET: ${FLOWISE_JWT_REFRESH_TOKEN_SECRET:-flowise-local-refresh-token-secret}
+      EXPRESS_SESSION_SECRET: ${FLOWISE_EXPRESS_SESSION_SECRET:-flowise-local-session-secret}
+      DATABASE_TYPE: postgres
+      DATABASE_HOST: db
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: ${POSTGRES_DB:-flowise}
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DATABASE_SSL: "false"
+      STORAGE_TYPE: s3
+      S3_STORAGE_BUCKET_NAME: flowise
+      S3_STORAGE_ACCESS_KEY_ID: ${FLOWISE_S3_ACCESS_KEY_ID:-flowise}
+      S3_STORAGE_SECRET_ACCESS_KEY: ${FLOWISE_S3_SECRET_ACCESS_KEY:-flowise-secret}
+      S3_STORAGE_REGION: garage
+      S3_ENDPOINT_URL: http://garage:3900
+      S3_FORCE_PATH_STYLE: "true"
+      LOG_PATH: /data/logs
+      SECRETKEY_STORAGE_TYPE: local
+      SECRETKEY_PATH: /data/secret
+      FLOWISE_SECRETKEY_OVERWRITE: ${FLOWISE_SECRET_KEY:-flowise-local-secret-key}
+      LOG_LEVEL: info
+      CUSTOM_MCP_SECURITY_CHECK: "true"
+      HTTP_SECURITY_CHECK: "true"
+
+volumes:
+  db-data:
+  garage-data:
+  flowise-data:

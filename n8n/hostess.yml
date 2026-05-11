@@ -1,0 +1,60 @@
+version: "1.0"
+name: n8n
+description: n8n workflow automation backed by Hostess-managed Postgres.
+
+services:
+  db:
+    type: postgres
+    retention: permanent
+    resources:
+      preset: large
+      storage: 50Gi
+    backups:
+      schedule: daily
+      retention: 14
+
+  n8n:
+    type: custom
+    image: docker.n8n.io/n8nio/n8n:stable
+    depends_on:
+      db:
+        condition: healthy
+    persistence:
+      mount: /home/node/.n8n
+      size: 10Gi
+      owner: "1000:1000"
+    ports:
+      - port: 5678
+        public: true
+    resources: large
+    health:
+      http: /healthz/readiness
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    env:
+      N8N_PORT: "5678"
+      N8N_LISTEN_ADDRESS: 0.0.0.0
+      N8N_PROTOCOL: https
+      N8N_HOST: ${n8n.external_host}
+      N8N_PROXY_HOPS: "1"
+      WEBHOOK_URL: ${n8n.external_url}
+      N8N_EDITOR_BASE_URL: ${n8n.external_url}
+
+      N8N_USER_FOLDER: /home/node/.n8n
+      N8N_ENCRYPTION_KEY: ${secret:N8N_ENCRYPTION_KEY}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_RUNNERS_ENABLED: "true"
+
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: ${db.host}
+      DB_POSTGRESDB_PORT: ${db.port}
+      DB_POSTGRESDB_DATABASE: ${db.database}
+      DB_POSTGRESDB_USER: ${db.user}
+      DB_POSTGRESDB_PASSWORD: ${db.password}
+      DB_POSTGRESDB_SCHEMA: public
+
+      GENERIC_TIMEZONE: UTC
+      TZ: UTC
+      N8N_METRICS: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"

@@ -1,0 +1,73 @@
+name: open-webui-llama
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-openwebui}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  llama:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    command:
+      - /app/llama-server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --hf-repo
+      - gguf-org/gemma-4-e2b-it-gguf:Q4_0
+      - --no-mmproj
+      - --ctx-size
+      - "4096"
+      - --parallel
+      - "1"
+      - --n-predict
+      - "512"
+    ports:
+      - "${LLAMA_PORT:-8081}:8080"
+    volumes:
+      - llama-data:/data
+    environment:
+      HF_HOME: /data/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+
+  webui:
+    image: ghcr.io/open-webui/open-webui:main
+    depends_on:
+      db:
+        condition: service_healthy
+      llama:
+        condition: service_healthy
+    ports:
+      - "${OPEN_WEBUI_PORT:-3000}:8080"
+    volumes:
+      - webui-data:/data
+    environment:
+      PORT: "8080"
+      WEBUI_URL: ${WEBUI_URL:-http://localhost:3000}
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-open-webui-local-secret}
+      DATA_DIR: /data/open-webui
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-openwebui}
+      ENABLE_OLLAMA_API: "false"
+      ENABLE_OPENAI_API: "true"
+      OPENAI_API_BASE_URL: http://llama:8080/v1
+      OPENAI_API_KEY: hostess-local-llama
+      AIOHTTP_CLIENT_TIMEOUT_OPENAI_MODEL_LIST: "60"
+
+volumes:
+  db-data:
+  llama-data:
+  webui-data:

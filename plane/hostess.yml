@@ -1,0 +1,318 @@
+version: "1.0"
+name: plane
+description: Plane project management stack on Hostess with managed Postgres, Redis, RabbitMQ, and Garage-backed uploads.
+
+# Notes:
+# - This uses Plane's published Docker images instead of Hostess build contexts.
+# - Plane's upstream proxy expects the object store service to be named
+#   plane-minio on port 9000. This example keeps that service name but runs a
+#   Garage S3-compatible object store behind it.
+# - The API service owns database migration through lifecycle.migrate.
+
+services:
+  db:
+    type: postgres
+    retention: permanent
+    resources:
+      preset: large
+      storage: 50Gi
+    backups:
+      schedule: daily
+      retention: 14
+
+  redis:
+    type: redis
+    retention: permanent
+    resources:
+      preset: medium
+
+  mq:
+    type: custom
+    image: rabbitmq:3.13.6-management-alpine
+    retention: permanent
+    ports:
+      - 5672
+    resources: medium
+    env:
+      RABBITMQ_DEFAULT_USER: plane
+      RABBITMQ_DEFAULT_PASS: ${secret:RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: plane
+      RABBITMQ_MNESIA_BASE: /data/mnesia
+      RABBITMQ_LOG_BASE: /data/log
+
+  plane-minio:
+    type: custom
+    image: dxflrs/garage:v2.2.0
+    retention: permanent
+    ports:
+      - 9000
+    resources: large
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+
+        : "${GARAGE_RPC_SECRET:?GARAGE_RPC_SECRET is required}"
+        : "${GARAGE_ADMIN_TOKEN:?GARAGE_ADMIN_TOKEN is required}"
+        : "${GARAGE_METRICS_TOKEN:?GARAGE_METRICS_TOKEN is required}"
+        : "${GARAGE_DEFAULT_ACCESS_KEY:?GARAGE_DEFAULT_ACCESS_KEY is required}"
+        : "${GARAGE_DEFAULT_SECRET_KEY:?GARAGE_DEFAULT_SECRET_KEY is required}"
+        : "${GARAGE_DEFAULT_BUCKET:?GARAGE_DEFAULT_BUCKET is required}"
+
+        mkdir -p /data/meta /data/data
+
+        cat >/etc/garage.toml <<EOF
+        metadata_dir = "/data/meta"
+        data_dir = "/data/data"
+        db_engine = "sqlite"
+        replication_factor = 1
+        rpc_bind_addr = "[::]:3901"
+        rpc_public_addr = "127.0.0.1:3901"
+        rpc_secret = "${GARAGE_RPC_SECRET}"
+
+        [s3_api]
+        s3_region = "${GARAGE_S3_REGION:-garage}"
+        api_bind_addr = "[::]:9000"
+        root_domain = ".s3.garage.localhost"
+
+        [s3_web]
+        bind_addr = "[::]:3902"
+        root_domain = ".web.garage.localhost"
+
+        [admin]
+        api_bind_addr = "[::]:3903"
+        admin_token = "${GARAGE_ADMIN_TOKEN}"
+        metrics_token = "${GARAGE_METRICS_TOKEN}"
+        EOF
+
+        export GARAGE_CONFIG_FILE=/etc/garage.toml
+
+        exec /garage server --single-node --default-bucket
+    health:
+      command: /garage status
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    env:
+      GARAGE_RPC_SECRET: ${secret:GARAGE_RPC_SECRET}
+      GARAGE_ADMIN_TOKEN: ${secret:GARAGE_ADMIN_TOKEN}
+      GARAGE_METRICS_TOKEN: ${secret:GARAGE_METRICS_TOKEN}
+      GARAGE_S3_REGION: garage
+      GARAGE_DEFAULT_BUCKET: uploads
+      GARAGE_DEFAULT_ACCESS_KEY: ${secret:AWS_ACCESS_KEY_ID}
+      GARAGE_DEFAULT_SECRET_KEY: ${secret:AWS_SECRET_ACCESS_KEY}
+
+  api:
+    type: custom
+    image: makeplane/plane-backend:v1.3.0
+    depends_on:
+      - db
+      - redis
+      - mq
+      - plane-minio
+    ports:
+      - 8000
+    resources: large
+    command:
+      - ./bin/docker-entrypoint-api.sh
+    lifecycle:
+      migrate:
+        command:
+          - ./bin/docker-entrypoint-migrator.sh
+        timeout: 10m
+        on_failure: abort
+    env:
+      DEBUG: "0"
+      SECRET_KEY: ${secret:PLANE_SECRET_KEY}
+      ALLOWED_HOSTS: "*"
+      CORS_ALLOWED_ORIGINS: ${proxy.external_url}
+
+      POSTGRES_USER: ${db.user}
+      POSTGRES_PASSWORD: ${db.password}
+      POSTGRES_HOST: ${db.host}
+      POSTGRES_PORT: ${db.port}
+      POSTGRES_DB: ${db.database}
+      DATABASE_URL: ${db.url}
+
+      REDIS_HOST: ${redis.host}
+      REDIS_PORT: ${redis.port}
+      REDIS_URL: ${redis.url}
+
+      RABBITMQ_HOST: ${mq.host}
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: plane
+      RABBITMQ_PASSWORD: ${secret:RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: plane
+
+      AWS_REGION: garage
+      AWS_ACCESS_KEY_ID: ${secret:AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${secret:AWS_SECRET_ACCESS_KEY}
+      AWS_S3_ENDPOINT_URL: ${plane-minio.url}
+      AWS_S3_BUCKET_NAME: uploads
+      FILE_SIZE_LIMIT: "5242880"
+      SIGNED_URL_EXPIRATION: "3600"
+      USE_MINIO: "1"
+      MINIO_ENDPOINT_SSL: "0"
+
+      WEB_URL: ${proxy.external_url}
+      APP_BASE_URL: ${proxy.external_url}
+      APP_BASE_PATH: /
+      ADMIN_BASE_URL: ${proxy.external_url}
+      ADMIN_BASE_PATH: /god-mode
+      SPACE_BASE_URL: ${proxy.external_url}
+      SPACE_BASE_PATH: /spaces
+      LIVE_BASE_URL: ${proxy.external_url}
+      LIVE_BASE_PATH: /live
+      LIVE_SERVER_SECRET_KEY: ${secret:LIVE_SERVER_SECRET_KEY}
+
+      GUNICORN_WORKERS: "2"
+      HARD_DELETE_AFTER_DAYS: "60"
+      API_KEY_RATE_LIMIT: 60/minute
+
+  worker:
+    type: custom
+    image: makeplane/plane-backend:v1.3.0
+    depends_on:
+      - api
+      - db
+      - redis
+      - mq
+    resources: medium
+    command:
+      - ./bin/docker-entrypoint-worker.sh
+    env:
+      DEBUG: "0"
+      SECRET_KEY: ${secret:PLANE_SECRET_KEY}
+      POSTGRES_USER: ${db.user}
+      POSTGRES_PASSWORD: ${db.password}
+      POSTGRES_HOST: ${db.host}
+      POSTGRES_PORT: ${db.port}
+      POSTGRES_DB: ${db.database}
+      DATABASE_URL: ${db.url}
+      REDIS_HOST: ${redis.host}
+      REDIS_PORT: ${redis.port}
+      REDIS_URL: ${redis.url}
+      RABBITMQ_HOST: ${mq.host}
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: plane
+      RABBITMQ_PASSWORD: ${secret:RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: plane
+      AWS_REGION: garage
+      AWS_ACCESS_KEY_ID: ${secret:AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${secret:AWS_SECRET_ACCESS_KEY}
+      AWS_S3_ENDPOINT_URL: ${plane-minio.url}
+      AWS_S3_BUCKET_NAME: uploads
+      USE_MINIO: "1"
+      WEB_URL: ${proxy.external_url}
+      LIVE_SERVER_SECRET_KEY: ${secret:LIVE_SERVER_SECRET_KEY}
+
+  beat-worker:
+    type: custom
+    image: makeplane/plane-backend:v1.3.0
+    depends_on:
+      - api
+      - db
+      - redis
+      - mq
+    resources: small
+    command:
+      - ./bin/docker-entrypoint-beat.sh
+    env:
+      DEBUG: "0"
+      SECRET_KEY: ${secret:PLANE_SECRET_KEY}
+      POSTGRES_USER: ${db.user}
+      POSTGRES_PASSWORD: ${db.password}
+      POSTGRES_HOST: ${db.host}
+      POSTGRES_PORT: ${db.port}
+      POSTGRES_DB: ${db.database}
+      DATABASE_URL: ${db.url}
+      REDIS_HOST: ${redis.host}
+      REDIS_PORT: ${redis.port}
+      REDIS_URL: ${redis.url}
+      RABBITMQ_HOST: ${mq.host}
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: plane
+      RABBITMQ_PASSWORD: ${secret:RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: plane
+      AWS_REGION: garage
+      AWS_ACCESS_KEY_ID: ${secret:AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${secret:AWS_SECRET_ACCESS_KEY}
+      AWS_S3_ENDPOINT_URL: ${plane-minio.url}
+      AWS_S3_BUCKET_NAME: uploads
+      USE_MINIO: "1"
+      WEB_URL: ${proxy.external_url}
+      LIVE_SERVER_SECRET_KEY: ${secret:LIVE_SERVER_SECRET_KEY}
+
+  web:
+    type: custom
+    image: makeplane/plane-frontend:v1.3.0
+    depends_on:
+      - api
+    ports:
+      - 3000
+    resources: medium
+
+  admin:
+    type: custom
+    image: makeplane/plane-admin:v1.3.0
+    depends_on:
+      - api
+      - web
+    ports:
+      - 3000
+    resources: small
+
+  space:
+    type: custom
+    image: makeplane/plane-space:v1.3.0
+    depends_on:
+      - api
+      - web
+    ports:
+      - 3000
+    resources: medium
+
+  live:
+    type: custom
+    image: makeplane/plane-live:v1.3.0
+    depends_on:
+      - redis
+    ports:
+      - 3000
+    resources: medium
+    env:
+      PORT: "3000"
+      API_BASE_URL: ${api.url}
+      WEB_BASE_URL: ${proxy.external_url}
+      LIVE_BASE_URL: ${proxy.external_url}
+      LIVE_BASE_PATH: /live
+      LIVE_SERVER_SECRET_KEY: ${secret:LIVE_SERVER_SECRET_KEY}
+      REDIS_HOST: ${redis.host}
+      REDIS_PORT: ${redis.port}
+      REDIS_URL: ${redis.url}
+
+  proxy:
+    type: custom
+    image: makeplane/plane-proxy:v1.3.0
+    depends_on:
+      - web
+      - api
+      - space
+      - admin
+      - live
+      - plane-minio
+    public: true
+    ports:
+      - port: 80
+        public: true
+    resources: medium
+    health:
+      http: /
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    env:
+      FILE_SIZE_LIMIT: "5242880"
+      BUCKET_NAME: uploads
+      SITE_ADDRESS: :80
+      TRUSTED_PROXIES: 0.0.0.0/0

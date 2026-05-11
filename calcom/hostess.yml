@@ -1,0 +1,75 @@
+version: "1.0"
+name: calcom
+description: Cal.com scheduling app backed by Hostess-managed Postgres and Redis.
+
+# Notes:
+# - This models the basic Cal.com self-hosted Docker path: web app + Postgres.
+# - Cal.com's v2 API service in docker-compose is still source-build-oriented,
+#   so it is intentionally not included here until there is a stable published
+#   image or a Hostess-maintained adapter image.
+# - Cal.com documents some NEXT_PUBLIC_* values as build-time Docker variables.
+#   The official Docker image rewrites NEXT_PUBLIC_WEBAPP_URL at startup, but
+#   deeper branding/org changes may still require publishing your own image.
+
+services:
+  db:
+    type: postgres
+    retention: permanent
+    resources:
+      preset: large
+      storage: 50Gi
+    backups:
+      schedule: daily
+      retention: 14
+
+  redis:
+    type: redis
+    retention: permanent
+    resources:
+      preset: medium
+
+  calcom:
+    type: nextjs
+    image: calcom/cal.com:v6.2.0
+    depends_on:
+      - db
+      - redis
+    public: true
+    ports:
+      - port: 3000
+        public: true
+    resources: large
+    health:
+      http: /
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    env:
+      NODE_ENV: production
+      LICENSE: agree
+      NEXT_PUBLIC_LICENSE_CONSENT: agree
+
+      NEXT_PUBLIC_WEBAPP_URL: ${calcom.external_url}
+      NEXTAUTH_URL: ${calcom.external_url}/api/auth
+      NEXTAUTH_SECRET: ${secret:NEXTAUTH_SECRET}
+      CALENDSO_ENCRYPTION_KEY: ${secret:CALENDSO_ENCRYPTION_KEY}
+
+      DATABASE_HOST: ${db.host}:${db.port}
+      DATABASE_URL: ${db.url}
+      DATABASE_DIRECT_URL: ${db.url}
+
+      REDIS_HOST: ${redis.host}
+      REDIS_PORT: ${redis.port}
+      REDIS_URL: ${redis.url}
+
+      GOOGLE_API_CREDENTIALS: "{}"
+      EMAIL_FROM_NAME: ${secret:EMAIL_FROM_NAME}
+      EMAIL_FROM: ${secret:EMAIL_FROM}
+      EMAIL_SERVER_HOST: ${secret:EMAIL_SERVER_HOST}
+      EMAIL_SERVER_PORT: ${secret:EMAIL_SERVER_PORT}
+      EMAIL_SERVER_USER: ${secret:EMAIL_SERVER_USER}
+      EMAIL_SERVER_PASSWORD: ${secret:EMAIL_SERVER_PASSWORD}
+
+      CALCOM_TELEMETRY_DISABLED: "1"
+      CSP_POLICY: ""
+      NEXT_PUBLIC_API_V2_URL: ${calcom.external_url}/api/v2

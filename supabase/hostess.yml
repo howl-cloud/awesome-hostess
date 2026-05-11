@@ -1,0 +1,83 @@
+version: "1.0"
+name: supabase-postgres
+description: Minimal Supabase-style Postgres dashboard on Hostess.
+
+services:
+  db:
+    type: postgres
+    retention: permanent
+    resources:
+      preset: large
+      storage: 50Gi
+    backups:
+      schedule: daily
+      retention: 14
+
+  meta:
+    type: custom
+    image: supabase/postgres-meta:v0.96.3
+    depends_on:
+      db:
+        condition: healthy
+    ports:
+      - 8080
+    resources: medium
+    env:
+      PG_META_PORT: "8080"
+      PG_META_DB_HOST: ${db.host}
+      PG_META_DB_PORT: ${db.port}
+      PG_META_DB_NAME: ${db.database}
+      PG_META_DB_USER: postgres
+      PG_META_DB_PASSWORD: ${db.password}
+      CRYPTO_KEY: ${secret:PG_META_CRYPTO_KEY}
+
+  rest:
+    type: custom
+    image: postgrest/postgrest:v14.8
+    depends_on:
+      db:
+        condition: healthy
+    resources: medium
+    command:
+      - postgrest
+    env:
+      PGRST_DB_URI: ${db.url}
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: postgres
+      PGRST_DB_MAX_ROWS: "1000"
+      PGRST_DB_EXTRA_SEARCH_PATH: public
+      PGRST_JWT_SECRET: ${secret:JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+
+  studio:
+    type: nextjs
+    image: supabase/studio:2026.04.27-sha-5f60601
+    depends_on:
+      meta:
+        condition: healthy
+      rest:
+        condition: healthy
+    public: true
+    resources: large
+    health:
+      http: /api/platform/profile
+      interval: 5s
+      timeout: 10s
+      retries: 3
+    env:
+      HOSTNAME: 0.0.0.0
+      STUDIO_PG_META_URL: ${meta.url}
+      POSTGRES_HOST: ${db.host}
+      POSTGRES_PORT: ${db.port}
+      POSTGRES_DB: ${db.database}
+      POSTGRES_PASSWORD: ${db.password}
+      PG_META_CRYPTO_KEY: ${secret:PG_META_CRYPTO_KEY}
+      DEFAULT_ORGANIZATION_NAME: "Default Organization"
+      DEFAULT_PROJECT_NAME: "Default Project"
+      SUPABASE_URL: ${studio.external_url}
+      SUPABASE_PUBLIC_URL: ${studio.external_url}
+      SUPABASE_ANON_KEY: ${secret:ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${secret:SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${secret:JWT_SECRET}
+      NEXT_PUBLIC_ENABLE_LOGS: "false"
+      NEXT_ANALYTICS_BACKEND_PROVIDER: postgres

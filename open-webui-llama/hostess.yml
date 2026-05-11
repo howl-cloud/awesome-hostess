@@ -1,0 +1,78 @@
+version: "1.0"
+name: open-webui-llama
+description: CPU-only Open WebUI backed by llama.cpp serving Gemma 4 E2B GGUF.
+
+services:
+  db:
+    type: postgres
+    retention: permanent
+    resources:
+      preset: large
+      storage: 50Gi
+    backups:
+      schedule: daily
+      retention: 14
+
+  llama:
+    type: custom
+    image: ghcr.io/ggml-org/llama.cpp:server
+    retention: permanent
+    ports:
+      - 8080
+    resources: xlarge
+    command:
+      - /app/llama-server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --hf-repo
+      - gguf-org/gemma-4-e2b-it-gguf:Q4_0
+      - --no-mmproj
+      - --ctx-size
+      - "4096"
+      - --parallel
+      - "1"
+      - --n-predict
+      - "512"
+    health:
+      http: /health
+      interval: 30s
+      timeout: 10s
+      retries: 20
+    env:
+      HF_HOME: /data/huggingface
+
+  webui:
+    type: custom
+    image: ghcr.io/open-webui/open-webui:main
+    depends_on:
+      - db
+      - llama
+    retention: permanent
+    ports:
+      - port: 8080
+        public: true
+    resources: large
+    health:
+      http: /health
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    env:
+      PORT: "8080"
+      WEBUI_URL: ${webui.external_url}
+      WEBUI_SECRET_KEY: ${secret:WEBUI_SECRET_KEY}
+      DATA_DIR: /data/open-webui
+
+      DATABASE_URL: ${db.url}
+
+      ENABLE_OLLAMA_API: "false"
+      ENABLE_OPENAI_API: "true"
+      OPENAI_API_BASE_URL: ${llama.url}/v1
+      OPENAI_API_KEY: hostess-local-llama
+      AIOHTTP_CLIENT_TIMEOUT_OPENAI_MODEL_LIST: "60"
+
+      # This example is intentionally CPU-only because Hostess does not expose GPU
+      # resource requests yet. For larger or faster local models, express interest
+      # in Hostess prioritizing GPU support.

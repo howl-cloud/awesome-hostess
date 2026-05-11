@@ -1,0 +1,56 @@
+name: nocodb
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-nocodb}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cache:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - cache-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nocodb:
+    image: nocodb/nocodb:latest
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    ports:
+      - "${NOCODB_PORT:-8080}:8080"
+    volumes:
+      - nocodb-data:/data
+    environment:
+      PORT: "8080"
+      NC_PUBLIC_URL: ${NC_PUBLIC_URL:-http://localhost:8080}
+      NUXT_PUBLIC_NC_BACKEND_URL: ${NC_PUBLIC_URL:-http://localhost:8080}
+      NC_DB: pg://db:5432?u=postgres&p=${POSTGRES_PASSWORD:-postgres}&d=${POSTGRES_DB:-nocodb}
+      NC_AUTH_JWT_SECRET: ${NOCODB_AUTH_JWT_SECRET:-nocodb-local-jwt-secret}
+      NC_CONNECTION_ENCRYPT_KEY: ${NOCODB_CONNECTION_ENCRYPT_KEY:-nocodb-local-encryption-key}
+      NC_REDIS_URL: redis://cache:6379
+      NC_TOOL_DIR: /data
+      NC_ADMIN_EMAIL: ${NOCODB_ADMIN_EMAIL:-admin@example.com}
+      NC_ADMIN_PASSWORD: ${NOCODB_ADMIN_PASSWORD:-nocodb}
+      NC_DISABLE_TELE: "true"
+
+volumes:
+  db-data:
+  cache-data:
+  nocodb-data:

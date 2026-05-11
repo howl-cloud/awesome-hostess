@@ -1,0 +1,51 @@
+version: "1.0"
+name: directus
+description: Directus CMS/API backed by Hostess-managed Postgres.
+
+services:
+  db:
+    type: postgres
+    retention: permanent
+    resources:
+      preset: large
+      storage: 50Gi
+    backups:
+      schedule: daily
+      retention: 14
+
+  directus:
+    type: custom
+    image: directus/directus:11
+    depends_on:
+      - db
+    ports:
+      - port: 8055
+        public: true
+    resources: large
+    retention: permanent
+    health:
+      http: /server/health
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    env:
+      HOST: 0.0.0.0
+      PORT: "8055"
+      PUBLIC_URL: ${directus.external_url}
+
+      SECRET: ${secret:DIRECTUS_SECRET}
+      ADMIN_EMAIL: ${secret:DIRECTUS_ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${secret:DIRECTUS_ADMIN_PASSWORD}
+
+      DB_CLIENT: pg
+      DB_HOST: ${db.host}
+      DB_PORT: ${db.port}
+      DB_DATABASE: ${db.database}
+      DB_USER: postgres
+      DB_PASSWORD: ${db.password}
+
+      STORAGE_LOCATIONS: local
+      STORAGE_LOCAL_DRIVER: local
+      STORAGE_LOCAL_ROOT: /data/uploads
+
+      WEBSOCKETS_ENABLED: "true"
