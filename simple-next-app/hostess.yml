@@ -1,0 +1,11 @@
+version: "1.0"
+name: simple-next-app
+description: Minimal Next.js app for the Hostess deploy-your-first-app guide.
+
+services:
+  app:
+    type: nextjs
+    build:
+      source: .
+      dockerfile: Dockerfile
+    resources: small
