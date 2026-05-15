@@ -1,0 +1,42 @@
+version: "1.0"
+name: simple-full-stack
+description: Minimal Next.js, FastAPI, and Postgres app for the Hostess guide.
+
+services:
+  database:
+    type: postgres
+    resources:
+      preset: small
+      storage: 10Gi
+    retention: permanent
+
+  api:
+    type: fastapi
+    public: true
+    build:
+      source: ./backend
+      dockerfile: Dockerfile
+    env:
+      DATABASE_URL: ${database.url}
+      CORS_ORIGINS: ${frontend.external_url}
+    depends_on:
+      - database
+    resources: small
+    lifecycle:
+      migrate:
+        command: ["python", "-m", "app.migrate"]
+        on_failure: abort
+        timeout: 5m
+    health:
+      http: /health
+
+  frontend:
+    type: nextjs
+    build:
+      source: ./frontend
+      dockerfile: Dockerfile
+    env:
+      API_URL: ${api.url}
+    depends_on:
+      - api
+    resources: small
