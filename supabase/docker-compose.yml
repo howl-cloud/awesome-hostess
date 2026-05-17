@@ -1,4 +1,4 @@
-name: supabase-postgres
+name: supabase
 
 services:
   db:
@@ -13,15 +13,117 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  supabase-db-init:
+    image: postgres:16-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    volumes:
+      - ./db/supabase-init.sql:/init/supabase-init.sql:ro
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-db}
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-supabase-local-jwt-secret-dev-only-32}
+      JWT_EXP: "3600"
+    command:
+      - sh
+      - -c
+      - |
+        psql \
+          -v ON_ERROR_STOP=1 \
+          -v dbname="$${PGDATABASE}" \
+          -v pgpass="$${PGPASSWORD}" \
+          -v jwt_secret="$${JWT_SECRET}" \
+          -v jwt_exp="$${JWT_EXP}" \
+          -f /init/supabase-init.sql
+
+  garage:
+    image: dxflrs/garage:v2.3.0
+    volumes:
+      - garage-data:/data
+      - ./garage.toml:/etc/garage.toml:ro
+    expose:
+      - "3900"
+    environment:
+      GARAGE_CONFIG_FILE: /etc/garage.toml
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:-0000000000000000000000000000000000000000000000000000000000000000}
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:-garage-admin-token}
+      GARAGE_METRICS_TOKEN: ${GARAGE_METRICS_TOKEN:-garage-metrics-token}
+      GARAGE_DEFAULT_ACCESS_KEY: ${SUPABASE_STORAGE_S3_ACCESS_KEY:-garage-access-key}
+      GARAGE_DEFAULT_SECRET_KEY: ${SUPABASE_STORAGE_S3_SECRET_KEY:-garage-secret-key}
+      GARAGE_DEFAULT_BUCKET: storage
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  analytics:
+    image: supabase/logflare:1.36.1
+    depends_on:
+      db:
+        condition: service_healthy
+      supabase-db-init:
+        condition: service_completed_successfully
+    expose:
+      - "4000"
+    environment:
+      LOGFLARE_NODE_HOST: 127.0.0.1
+      DB_USERNAME: supabase_admin
+      DB_DATABASE: ${POSTGRES_DB:-db}
+      DB_HOSTNAME: db
+      DB_PORT: "5432"
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_SCHEMA: _analytics
+      LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN:-logflare-public-token}
+      LOGFLARE_PRIVATE_ACCESS_TOKEN: ${LOGFLARE_PRIVATE_ACCESS_TOKEN:-logflare-private-token}
+      LOGFLARE_SINGLE_TENANT: "true"
+      LOGFLARE_SUPABASE_MODE: "true"
+      POSTGRES_BACKEND_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-db}
+      POSTGRES_BACKEND_SCHEMA: _analytics
+      LOGFLARE_FEATURE_FLAG_OVERRIDE: multibackend=true
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4000/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  vector:
+    image: timberio/vector:0.53.0-alpine
+    depends_on:
+      analytics:
+        condition: service_healthy
+    volumes:
+      - ./logs/vector.yml:/etc/vector/vector.yml:ro
+    expose:
+      - "9001"
+    command:
+      - --config
+      - /etc/vector/vector.yml
+    environment:
+      LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN:-logflare-public-token}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:9001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   meta:
     image: supabase/postgres-meta:v0.96.3
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "${POSTGRES_META_PORT:-8080}:8080"
+      supabase-db-init:
+        condition: service_completed_successfully
+    expose:
+      - "8080"
     environment:
       PG_META_PORT: "8080"
       PG_META_DB_HOST: db
@@ -36,26 +138,211 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "${POSTGREST_PORT:-3001}:3000"
+      supabase-db-init:
+        condition: service_completed_successfully
+    expose:
+      - "3000"
     command:
       - postgrest
     environment:
       PGRST_DB_URI: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-db}
       PGRST_DB_SCHEMAS: public
-      PGRST_DB_ANON_ROLE: postgres
+      PGRST_DB_ANON_ROLE: anon
       PGRST_DB_MAX_ROWS: "1000"
       PGRST_DB_EXTRA_SEARCH_PATH: public
-      PGRST_JWT_SECRET: ${JWT_SECRET:-supabase-local-jwt-secret}
+      PGRST_JWT_SECRET: ${JWT_JWKS:-{"keys":[]}}
       PGRST_DB_USE_LEGACY_GUCS: "false"
+
+  auth:
+    image: supabase/gotrue:v2.186.0
+    depends_on:
+      db:
+        condition: service_healthy
+      supabase-db-init:
+        condition: service_completed_successfully
+    expose:
+      - "9999"
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
+      GOTRUE_SITE_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
+      GOTRUE_URI_ALLOW_LIST: "*"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgresql://supabase_auth_admin:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-db}
+      GOTRUE_DB_NAMESPACE: auth
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:-supabase-local-jwt-secret-dev-only-32}
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_OPERATOR_TOKEN: ${SERVICE_ROLE_KEY:-supabase-local-service-role-key}
+      GOTRUE_JWT_KEYS: ${JWT_KEYS:-[]}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9999/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  realtime:
+    image: supabase/realtime:v2.76.5
+    depends_on:
+      db:
+        condition: service_healthy
+      supabase-db-init:
+        condition: service_completed_successfully
+    expose:
+      - "4000"
+    environment:
+      PORT: "4000"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-db}
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_SSL: "false"
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      DB_ENC_KEY: ${REALTIME_DB_ENC_KEY:-supabase-realtime-local-enc-key}
+      ANON_KEY: ${SUPABASE_PUBLISHABLE_KEY:-sb_publishable_local}
+      API_JWT_SECRET: ${JWT_SECRET:-supabase-local-jwt-secret-dev-only-32}
+      API_JWT_JWKS: ${JWT_JWKS:-{"keys":[]}}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-supabase-realtime-secret-key-base}
+      METRICS_JWT_SECRET: ${JWT_SECRET:-supabase-local-jwt-secret-dev-only-32}
+      ERL_AFLAGS: "-proto_dist inet_tcp"
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+      # Health endpoint validates legacy HS256 anon JWT (same secret family as API_JWT_SECRET), not the opaque key or ES256 asymmetric token.
+      REALTIME_HEALTHCHECK_JWT: ${ANON_KEY:-}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --head -H \"Authorization: Bearer $${REALTIME_HEALTHCHECK_JWT}\" http://127.0.0.1:4000/api/tenants/realtime-dev/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  imgproxy:
+    image: darthsim/imgproxy:v3.30.1
+    expose:
+      - "5001"
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+      IMGPROXY_AUTO_WEBP: "true"
+      IMGPROXY_MAX_SRC_RESOLUTION: "16.8"
+    healthcheck:
+      test: ["CMD", "imgproxy", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  storage:
+    image: supabase/storage-api:v1.48.26
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+      auth:
+        condition: service_healthy
+      imgproxy:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+      supabase-db-init:
+        condition: service_completed_successfully
+    expose:
+      - "5000"
+    environment:
+      ANON_KEY: ${SUPABASE_PUBLISHABLE_KEY:-sb_publishable_local}
+      SERVICE_KEY: ${SUPABASE_SECRET_KEY:-sb_secret_local}
+      SERVICE_ROLE_KEY: ${SUPABASE_SECRET_KEY:-sb_secret_local}
+      AUTH_JWT_SECRET: ${JWT_SECRET:-supabase-local-jwt-secret-dev-only-32}
+      PGRST_JWT_SECRET: ${JWT_JWKS:-{"keys":[]}}
+      JWT_JWKS: ${JWT_JWKS:-{"keys":[]}}
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-db}
+      POSTGREST_URL: http://rest:3000
+      POSTGREST_JWT_SECRET: ${JWT_SECRET:-supabase-local-jwt-secret-dev-only-32}
+      STORAGE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
+      REQUEST_ALLOW_X_FORWARDED_PATH: "true"
+      FILE_SIZE_LIMIT: "52428800"
+      STORAGE_BACKEND: s3
+      STORAGE_S3_BUCKET: storage
+      STORAGE_S3_ENDPOINT: http://garage:3900
+      STORAGE_S3_FORCE_PATH_STYLE: "true"
+      AWS_ACCESS_KEY_ID: ${SUPABASE_STORAGE_S3_ACCESS_KEY:-garage-access-key}
+      AWS_SECRET_ACCESS_KEY: ${SUPABASE_STORAGE_S3_SECRET_KEY:-garage-secret-key}
+      AWS_DEFAULT_REGION: garage
+      REGION: garage
+      GLOBAL_S3_BUCKET: storage
+      GLOBAL_S3_ENDPOINT: http://garage:3900
+      GLOBAL_S3_PROTOCOL: http
+      GLOBAL_S3_FORCE_PATH_STYLE: "true"
+      S3_PROTOCOL_ACCESS_KEY_ID: ${SUPABASE_STORAGE_S3_ACCESS_KEY:-garage-access-key}
+      S3_PROTOCOL_ACCESS_KEY_SECRET: ${SUPABASE_STORAGE_S3_SECRET_KEY:-garage-secret-key}
+      TENANT_ID: stub
+      IS_MULTITENANT: "false"
+      ENABLE_IMAGE_TRANSFORMATION: "true"
+      IMGPROXY_URL: http://imgproxy:5001
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:5000/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  functions:
+    image: supabase/edge-runtime:v1.71.2
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+      rest:
+        condition: service_started
+    volumes:
+      - ./functions/main/index.ts:/home/deno/functions/main/index.ts:ro
+    expose:
+      - "9000"
+    command:
+      - start
+      - --main-service
+      - /home/deno/functions/main
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-supabase-local-jwt-secret-dev-only-32}
+      VERIFY_JWT: "false"
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
+      SUPABASE_ANON_KEY: ${SUPABASE_PUBLISHABLE_KEY:-sb_publishable_local}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SECRET_KEY:-sb_secret_local}
+      SUPABASE_PUBLISHABLE_KEYS: ${SUPABASE_PUBLISHABLE_KEYS:-{"default":"sb_publishable_local"}}
+      SUPABASE_SECRET_KEYS: ${SUPABASE_SECRET_KEYS:-{"default":"sb_secret_local"}}
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-db}
 
   studio:
     image: supabase/studio:2026.04.27-sha-5f60601
     depends_on:
-      - meta
-      - rest
-    ports:
-      - "${SUPABASE_STUDIO_PORT:-3000}:3000"
+      meta:
+        condition: service_started
+      rest:
+        condition: service_started
+      auth:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+      realtime:
+        condition: service_healthy
+      analytics:
+        condition: service_healthy
+    expose:
+      - "3000"
+    volumes:
+      - studio-snippets:/app/snippets
+      - studio-edge-functions:/app/edge-functions
     environment:
       HOSTNAME: 0.0.0.0
       STUDIO_PG_META_URL: http://meta:8080
@@ -63,16 +350,124 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:-db}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_USER_READ_WRITE: postgres
       PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY:-supabase-meta-local-crypto-key}
       DEFAULT_ORGANIZATION_NAME: Default Organization
       DEFAULT_PROJECT_NAME: Default Project
-      SUPABASE_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:3000}
-      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:3000}
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_MAX_ROWS: "1000"
+      PGRST_DB_EXTRA_SEARCH_PATH: public
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
+      SUPABASE_ANON_KEY: ${SUPABASE_PUBLISHABLE_KEY:-sb_publishable_local}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SECRET_KEY:-sb_secret_local}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SECRET_KEY:-sb_secret_local}
+      AUTH_JWT_SECRET: ${JWT_SECRET:-supabase-local-jwt-secret-dev-only-32}
+      LOGFLARE_API_KEY: ${LOGFLARE_PUBLIC_ACCESS_TOKEN:-logflare-public-token}
+      LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN:-logflare-public-token}
+      LOGFLARE_PRIVATE_ACCESS_TOKEN: ${LOGFLARE_PRIVATE_ACCESS_TOKEN:-logflare-private-token}
+      LOGFLARE_URL: http://analytics:4000
+      NEXT_PUBLIC_ENABLE_LOGS: "true"
+      NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
+      SNIPPETS_MANAGEMENT_FOLDER: /app/snippets
+      EDGE_FUNCTIONS_MANAGEMENT_FOLDER: /app/edge-functions
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-admin}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-password}
+      ENABLE_AUTH: "true"
+      AUTH_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}/auth/v1
+      STORAGE_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}/storage/v1
+      REALTIME_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}/realtime/v1
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/platform/profile').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  kong:
+    image: kong/kong:3.9.1
+    depends_on:
+      studio:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+      rest:
+        condition: service_started
+      storage:
+        condition: service_healthy
+      realtime:
+        condition: service_healthy
+      analytics:
+        condition: service_healthy
+    ports:
+      - "${KONG_HTTP_PORT:-8000}:8000"
+    volumes:
+      - ./kong.yml:/home/kong/temp.yml:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+
+        if [ -n "$${SUPABASE_SECRET_KEY:-}" ] && [ -n "$${SUPABASE_PUBLISHABLE_KEY:-}" ]; then
+          export LUA_AUTH_EXPR="\$$((headers.authorization ~= nil and headers.authorization:sub(1, 10) ~= 'Bearer sb_' and headers.authorization) or (headers.apikey == '$$SUPABASE_SECRET_KEY' and 'Bearer $$SERVICE_ROLE_KEY_ASYMMETRIC') or (headers.apikey == '$$SUPABASE_PUBLISHABLE_KEY' and 'Bearer $$ANON_KEY_ASYMMETRIC') or headers.apikey)"
+          export LUA_RT_AUTH_EXPR="\$$((headers.authorization ~= nil and headers.authorization:sub(1, 10) ~= 'Bearer sb_' and headers.authorization) or (headers.apikey == '$$SUPABASE_SECRET_KEY' and 'Bearer $$SUPABASE_SERVICE_KEY') or (headers.apikey == '$$SUPABASE_PUBLISHABLE_KEY' and 'Bearer $$SUPABASE_ANON_KEY') or headers.apikey)"
+          export LUA_RT_WS_EXPR="\$$((query_params.apikey == '$$SUPABASE_SECRET_KEY' and '$$SUPABASE_SERVICE_KEY') or (query_params.apikey == '$$SUPABASE_PUBLISHABLE_KEY' and '$$SUPABASE_ANON_KEY') or query_params.apikey)"
+        else
+          export LUA_AUTH_EXPR='$((headers.authorization ~= nil and headers.authorization:sub(1, 10) ~= "Bearer sb_" and headers.authorization) or headers.apikey)'
+          export LUA_RT_AUTH_EXPR='$((headers.authorization ~= nil and headers.authorization:sub(1, 10) ~= "Bearer sb_" and headers.authorization) or headers.apikey)'
+          export LUA_RT_WS_EXPR='$(query_params.apikey)'
+        fi
+
+        awk '
+          {
+            result = ""
+            rest = $0
+            while (match(rest, /\$[A-Za-z_][A-Za-z_0-9]*/)) {
+              varname = substr(rest, RSTART + 1, RLENGTH - 1)
+              if (varname in ENVIRON) {
+                result = result substr(rest, 1, RSTART - 1) ENVIRON[varname]
+              } else {
+                result = result substr(rest, 1, RSTART + RLENGTH - 1)
+              }
+              rest = substr(rest, RSTART + RLENGTH)
+            }
+            print result rest
+          }
+        ' /home/kong/temp.yml > "$$KONG_DECLARATIVE_CONFIG"
+
+        sed -i '/^[[:space:]]*- key:[[:space:]]*$$/d' "$$KONG_DECLARATIVE_CONFIG"
+
+        exec /entrypoint.sh kong docker-start
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_DNS_NOT_FOUND_TTL: "1"
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth,request-termination,ip-restriction,post-function
+      KONG_NGINX_WORKER_PROCESSES: "2"
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-admin}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-password}
       SUPABASE_ANON_KEY: ${ANON_KEY:-supabase-local-anon-key}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY:-supabase-local-service-role-key}
-      AUTH_JWT_SECRET: ${JWT_SECRET:-supabase-local-jwt-secret}
-      NEXT_PUBLIC_ENABLE_LOGS: "false"
-      NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-sb_publishable_local}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-sb_secret_local}
+      ANON_KEY_ASYMMETRIC: ${ANON_KEY_ASYMMETRIC:-anon-asymmetric-jwt}
+      SERVICE_ROLE_KEY_ASYMMETRIC: ${SERVICE_ROLE_KEY_ASYMMETRIC:-service-role-asymmetric-jwt}
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
 volumes:
   db-data:
+  garage-data:
+  studio-snippets:
+  studio-edge-functions:

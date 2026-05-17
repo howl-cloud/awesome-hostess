@@ -1,0 +1,25 @@
+# Garage config shared by docker-compose.yml and hostess.yml. Secrets in this file are placeholders:
+# GARAGE_RPC_SECRET, GARAGE_ADMIN_TOKEN, and GARAGE_METRICS_TOKEN from the
+# environment replace these values when the daemon starts (see `garage --help`).
+
+metadata_dir = "/data/meta"
+data_dir = "/data/data"
+db_engine = "sqlite"
+replication_factor = 1
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret = "0000000000000000000000000000000000000000000000000000000000000000"
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:3900"
+root_domain = ".s3.garage.localhost"
+
+[s3_web]
+bind_addr = "[::]:3902"
+root_domain = ".web.garage.localhost"
+
+[admin]
+api_bind_addr = "[::]:3903"
+admin_token = "placeholder-replaced-by-garage-admin-token-env"
+metrics_token = "placeholder-replaced-by-garage-metrics-token-env"

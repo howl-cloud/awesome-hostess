@@ -7,7 +7,7 @@ services:
     type: postgres
     retention: permanent
     resources:
-      preset: large
+      preset: medium
       storage: 50Gi
     backups:
       schedule: daily
@@ -53,7 +53,7 @@ services:
     ports:
       - port: 8080
         public: true
-    resources: large
+    resources: medium
     health:
       http: /health
       interval: 15s

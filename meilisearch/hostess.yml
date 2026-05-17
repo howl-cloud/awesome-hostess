@@ -9,7 +9,7 @@ services:
     retention: permanent
     ports:
       - 7700
-    resources: large
+    resources: medium
     health:
       http: /health
       interval: 10s
