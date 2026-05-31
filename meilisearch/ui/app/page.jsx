@@ -22,6 +22,51 @@ async function requestMeili(path, apiKey, options = {}) {
   return payload;
 }
 
+function FieldValue({ value }) {
+  if (value === null || value === undefined) return <span className="fv-null">null</span>;
+  if (typeof value === "boolean") return <span className="fv-bool">{String(value)}</span>;
+  if (typeof value === "number") return <span className="fv-num">{value}</span>;
+  if (Array.isArray(value)) {
+    const preview = value.slice(0, 3).map((v) => (typeof v === "object" ? "…" : String(v))).join(", ");
+    return <span className="fv-array">[{preview}{value.length > 3 ? `, +${value.length - 3}` : ""}]</span>;
+  }
+  if (typeof value === "object") {
+    return <span className="fv-obj">{JSON.stringify(value)}</span>;
+  }
+  const str = String(value);
+  return <span title={str.length > 90 ? str : undefined}>{str.length > 90 ? str.slice(0, 90) + "…" : str}</span>;
+}
+
+const TITLE_KEYS = ["title", "name", "label", "heading", "subject", "question"];
+
+function ResultCard({ hit, rank }) {
+  const entries = Object.entries(hit).filter(([k]) => !k.startsWith("_"));
+  const titleEntry = entries.find(([k]) => TITLE_KEYS.some((t) => k.toLowerCase().includes(t)));
+  const titleValue = titleEntry ? String(titleEntry[1]) : null;
+  const fields = titleEntry ? entries.filter(([k]) => k !== titleEntry[0]) : entries;
+
+  return (
+    <article className="resultCard">
+      <div className="rcInner">
+        <div className="rcHeader">
+          <span className="rcRank">#{String(rank).padStart(2, "0")}</span>
+          {titleValue && <p className="rcTitle">{titleValue}</p>}
+        </div>
+        <dl className="fieldGrid">
+          {fields.map(([key, value]) => (
+            <div className="fieldRow" key={key}>
+              <dt className="fieldKey">{key}</dt>
+              <dd className="fieldVal">
+                <FieldValue value={value} />
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </article>
+  );
+}
+
 export default function Page() {
   const [apiKey, setApiKey] = useState("");
   const [savedKey, setSavedKey] = useState("");
@@ -86,7 +131,7 @@ export default function Page() {
       const hits = payload.hits || [];
       setResults(hits);
       setSummary({
-        title: query.trim() ? `Search: "${query.trim()}"` : "All documents",
+        title: query.trim() ? `"${query.trim()}"` : "All documents",
         hits: payload.estimatedTotalHits ?? hits.length,
         latency: `${payload.processingTimeMs || 0}ms`,
       });
@@ -105,100 +150,166 @@ export default function Page() {
     loadIndexes(storedKey);
   }, []);
 
+  const showIndexChips = indexes.length > 0 && indexes.length <= 8;
+
   return (
-    <main className="shell">
-      <section className="mast">
-        <div>
-          <p className="eyebrow">Hostess search surface</p>
-          <h1>Meilisearch Console</h1>
-        </div>
-        <div className={`status ${health === "available" ? "is-ok" : health === "offline" ? "is-bad" : ""}`}>
-          <span className="statusDot" />
-          <span>{statusLabel}</span>
-        </div>
-      </section>
-
-      <section className="controlGrid">
-        <form className="panel" onSubmit={saveKey}>
-          <label htmlFor="apiKey">API key</label>
-          <div className="inlineRow">
-            <input
-              id="apiKey"
-              type="password"
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-              placeholder="Paste a Meilisearch key"
-              autoComplete="off"
-            />
-            <button type="submit">Save</button>
+    <div className="app">
+      {/* ── Header ── */}
+      <header className="appHeader">
+        <div className="headerInner">
+          <div className="headerBrand">
+            <span className="brandIcon" aria-hidden="true">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+                <path d="M2 8.5C2 4.91 4.91 2 8.5 2C12.09 2 15 4.91 15 8.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                <path d="M2 8.5C2 12.09 4.91 15 8.5 15C12.09 15 15 12.09 15 8.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeOpacity="0.35"/>
+                <circle cx="8.5" cy="8.5" r="2" fill="currentColor"/>
+              </svg>
+            </span>
+            <span className="brandName">Meilisearch Console</span>
+            <span className="brandSep">/</span>
+            <span className="brandSub">hostess</span>
           </div>
-          <p className="hint">Use a search-only key for daily search. The master key works but should stay private.</p>
-        </form>
-
-        <form className="panel searchPanel" onSubmit={search}>
-          <div className="searchTopline">
-            <label htmlFor="indexName">Index</label>
-            <button className="ghostButton" type="button" onClick={() => loadIndexes()}>
-              Refresh
-            </button>
-          </div>
-          <input
-            id="indexName"
-            list="indexOptions"
-            value={indexName}
-            onChange={(event) => setIndexName(event.target.value)}
-            placeholder="products"
-          />
-          <datalist id="indexOptions">
-            {indexes.map((index) => (
-              <option key={index.uid} value={index.uid} />
-            ))}
-          </datalist>
-          <label htmlFor="query">Query</label>
-          <div className="inlineRow">
-            <input
-              id="query"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search documents"
-            />
-            <button type="submit">Search</button>
-          </div>
-        </form>
-      </section>
-
-      <section className="resultsHead">
-        <div>
-          <p className="eyebrow">Results</p>
-          <h2>{summary.title}</h2>
-        </div>
-        <div className="metricStrip">
-          <div>
-            <span>{summary.hits}</span>
-            <small>hits</small>
-          </div>
-          <div>
-            <span>{summary.latency}</span>
-            <small>latency</small>
+          <div className={`statusBadge ${health === "available" ? "status-ok" : health === "offline" ? "status-bad" : "status-checking"}`}>
+            <span className="statusDot" />
+            {statusLabel}
           </div>
         </div>
-      </section>
+      </header>
 
-      <section className="results">
-        {hasResults ? (
-          results.map((hit, index) => (
-            <article className="resultCard" data-rank={String(index + 1).padStart(2, "0")} key={`${index}-${JSON.stringify(hit).slice(0, 80)}`}>
-              <pre>{JSON.stringify(hit, null, 2)}</pre>
-            </article>
-          ))
-        ) : (
-          <article className="emptyState">
-            <h3>{message || "No results yet."}</h3>
-            <p>The Next.js app keeps Meilisearch private and proxies API calls through its server route.</p>
-          </article>
-        )}
-      </section>
-    </main>
+      {/* ── Main ── */}
+      <main className="appMain">
+        <div className="container">
+
+          {/* Controls */}
+          <div className="controlRow">
+
+            {/* API key */}
+            <form className="card" onSubmit={saveKey}>
+              <label className="cardLabel" htmlFor="apiKey">API Key</label>
+              <div className="inputRow">
+                <input
+                  id="apiKey"
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Paste a Meilisearch key…"
+                  autoComplete="off"
+                  className="textInput"
+                />
+                <button type="submit" className="btn btn-primary">Save</button>
+              </div>
+              <p className="cardHint">Use a search-only key for daily use. The master key works but should stay private.</p>
+            </form>
+
+            {/* Index + search */}
+            <form className="card" onSubmit={search}>
+              <div className="cardLabelRow">
+                <label className="cardLabel" htmlFor="indexName">Index</label>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => loadIndexes()}>
+                  ↻ Refresh
+                </button>
+              </div>
+
+              {showIndexChips ? (
+                <div className="indexChips">
+                  {indexes.map((idx) => (
+                    <button
+                      key={idx.uid}
+                      type="button"
+                      className={`indexChip${indexName === idx.uid ? " indexChipActive" : ""}`}
+                      onClick={() => setIndexName(idx.uid)}
+                    >
+                      {idx.uid}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <input
+                    id="indexName"
+                    list="indexOptions"
+                    value={indexName}
+                    onChange={(e) => setIndexName(e.target.value)}
+                    placeholder="products"
+                    className="textInput"
+                  />
+                  <datalist id="indexOptions">
+                    {indexes.map((index) => (
+                      <option key={index.uid} value={index.uid} />
+                    ))}
+                  </datalist>
+                </>
+              )}
+
+              <div className="searchGap">
+                <label className="cardLabel" htmlFor="query">Query</label>
+                <div className="searchRow">
+                  <div className="searchInputWrap">
+                    <span className="searchIcon" aria-hidden="true">
+                      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                        <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
+                        <path d="M10 10L13.5 13.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                      </svg>
+                    </span>
+                    <input
+                      id="query"
+                      type="search"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search documents…"
+                      className="searchInput"
+                    />
+                  </div>
+                  <button type="submit" className="btn btn-primary">Search</button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Results header */}
+          <div className="resultsHeader">
+            <div className="resultsTitleGroup">
+              <span className="resultsSectionLabel">Results</span>
+              {hasResults && <span className="resultsQuery">{summary.title}</span>}
+            </div>
+            <div className="metricChips">
+              <div className="metricChip">
+                <span className="metricNum">{summary.hits}</span>
+                <span className="metricLabel">hits</span>
+              </div>
+              <div className="metricChip">
+                <span className="metricNum">{summary.latency}</span>
+                <span className="metricLabel">latency</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Results */}
+          <div className="results">
+            {hasResults ? (
+              results.map((hit, index) => (
+                <ResultCard
+                  key={`${index}-${JSON.stringify(hit).slice(0, 80)}`}
+                  hit={hit}
+                  rank={index + 1}
+                />
+              ))
+            ) : (
+              <div className="emptyState">
+                <span className="emptyIcon" aria-hidden="true">
+                  <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+                    <circle cx="15" cy="15" r="10" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M22.5 22.5L30 30" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M11 15H19M15 11V19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </span>
+                <p className="emptyTitle">{message || "No results yet."}</p>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </main>
+    </div>
   );
 }

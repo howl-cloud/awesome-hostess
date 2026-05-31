@@ -25,10 +25,26 @@ services:
     depends_on:
       meilisearch:
         condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     ports:
       - "${MEILI_UI_PORT:-3000}:3000"
     environment:
       MEILI_URL: http://meilisearch:7700
+
+  seed:
+    image: node:22-alpine
+    depends_on:
+      meilisearch:
+        condition: service_healthy
+    volumes:
+      - ./seed/seed.mjs:/tmp/seed.mjs:ro
+      - ./seed/books.json:/tmp/books.json:ro
+    environment:
+      MEILI_URL: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-meili-local-master-key}
+    command: ["node", "/tmp/seed.mjs"]
+    restart: "no"
 
 volumes:
   meili-data:

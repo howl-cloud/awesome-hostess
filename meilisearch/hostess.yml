@@ -26,7 +26,10 @@ services:
     type: nextjs
     image: ghcr.io/howl-cloud/awesome-hostess/meilisearch-ui:latest
     depends_on:
-      - meilisearch
+      meilisearch:
+        condition: healthy
+      seed-meilisearch:
+        condition: completed
     ports:
       - port: 3000
         public: true
@@ -38,3 +41,25 @@ services:
       retries: 6
     env:
       MEILI_URL: ${meilisearch.url}
+
+jobs:
+  seed-meilisearch:
+    image: node:22-alpine
+    depends_on:
+      meilisearch:
+        condition: healthy
+    run: once
+    timeout: 2m
+    resources: small
+    files:
+      - name: seed-script
+        mount: /tmp/seed.mjs
+        source: ./seed/seed.mjs
+      - name: seed-documents
+        mount: /tmp/books.json
+        source: ./seed/books.json
+    env:
+      MEILI_URL: ${meilisearch.url}
+      MEILI_MASTER_KEY: ${secret:MEILI_MASTER_KEY}
+    entrypoint: ["node"]
+    command: ["/tmp/seed.mjs"]

@@ -1,0 +1,98 @@
+[
+  {
+    "id": 1,
+    "title": "Dune",
+    "author": "Frank Herbert",
+    "year": 1965,
+    "genre": "science fiction",
+    "description": "A desert planet, a noble family, and a political struggle over the most valuable resource in the known universe."
+  },
+  {
+    "id": 2,
+    "title": "The Left Hand of Darkness",
+    "author": "Ursula K. Le Guin",
+    "year": 1969,
+    "genre": "science fiction",
+    "description": "An envoy visits a frozen world and learns how culture, trust, and identity shape diplomacy."
+  },
+  {
+    "id": 3,
+    "title": "Kindred",
+    "author": "Octavia E. Butler",
+    "year": 1979,
+    "genre": "speculative fiction",
+    "description": "A modern woman is pulled into the antebellum South and forced to confront family history and survival."
+  },
+  {
+    "id": 4,
+    "title": "The Dispossessed",
+    "author": "Ursula K. Le Guin",
+    "year": 1974,
+    "genre": "science fiction",
+    "description": "A physicist moves between twin worlds with opposing social systems while pursuing a theory of time."
+  },
+  {
+    "id": 5,
+    "title": "Neuromancer",
+    "author": "William Gibson",
+    "year": 1984,
+    "genre": "cyberpunk",
+    "description": "A washed-up hacker is hired for a dangerous job in a world of artificial intelligence and corporate power."
+  },
+  {
+    "id": 6,
+    "title": "Parable of the Sower",
+    "author": "Octavia E. Butler",
+    "year": 1993,
+    "genre": "dystopian",
+    "description": "A young woman builds a new belief system while traveling through a collapsing near-future America."
+  },
+  {
+    "id": 7,
+    "title": "The Fifth Season",
+    "author": "N. K. Jemisin",
+    "year": 2015,
+    "genre": "fantasy",
+    "description": "A fractured world faces recurring catastrophe while people with earth-shaping power are feared and controlled."
+  },
+  {
+    "id": 8,
+    "title": "Piranesi",
+    "author": "Susanna Clarke",
+    "year": 2020,
+    "genre": "fantasy",
+    "description": "A man records the wonders of an endless house filled with halls, statues, tides, and hidden memories."
+  },
+  {
+    "id": 9,
+    "title": "The City and the City",
+    "author": "China Mieville",
+    "year": 2009,
+    "genre": "mystery",
+    "description": "A murder investigation crosses two cities that occupy the same physical space but are socially kept apart."
+  },
+  {
+    "id": 10,
+    "title": "Station Eleven",
+    "author": "Emily St. John Mandel",
+    "year": 2014,
+    "genre": "post-apocalyptic",
+    "description": "A traveling theater company preserves art and memory after a pandemic changes the shape of civilization."
+  },
+  {
+    "id": 11,
+    "title": "The Three-Body Problem",
+    "author": "Cixin Liu",
+    "year": 2008,
+    "genre": "science fiction",
+    "description": "A secret contact with an alien civilization reshapes science, politics, and the future of humanity."
+  },
+  {
+    "id": 12,
+    "title": "A Memory Called Empire",
+    "author": "Arkady Martine",
+    "year": 2019,
+    "genre": "space opera",
+    "description": "An ambassador navigates court politics, imperial culture, and a murder investigation on a powerful capital world."
+  }
+]
