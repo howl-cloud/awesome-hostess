@@ -1,6 +1,6 @@
 version: "1.0"
-name: n8n
-description: n8n workflow automation backed by Hostess-managed Postgres.
+name: n8n-hostess
+description: n8n workflow automation stack
 
 services:
   db:
@@ -13,11 +13,19 @@ services:
       schedule: daily
       retention: 14
 
+  redis:
+    type: redis
+    retention: permanent
+    resources:
+      preset: small
+
   n8n:
     type: custom
     image: docker.n8n.io/n8nio/n8n:stable
     depends_on:
       db:
+        condition: healthy
+      redis:
         condition: healthy
     persistence:
       mount: /home/node/.n8n
@@ -45,6 +53,7 @@ services:
       N8N_ENCRYPTION_KEY: ${secret:N8N_ENCRYPTION_KEY}
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
       N8N_RUNNERS_ENABLED: "true"
+      EXECUTIONS_MODE: queue
 
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: ${db.host}
@@ -54,7 +63,55 @@ services:
       DB_POSTGRESDB_PASSWORD: ${db.password}
       DB_POSTGRESDB_SCHEMA: public
 
+      QUEUE_BULL_REDIS_HOST: ${redis.host}
+      QUEUE_BULL_REDIS_PORT: ${redis.port}
+      QUEUE_BULL_REDIS_PASSWORD: ${redis.password}
+      QUEUE_BULL_REDIS_DB: "0"
+
       GENERIC_TIMEZONE: UTC
       TZ: UTC
       N8N_METRICS: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+
+  n8n-worker:
+    type: custom
+    image: docker.n8n.io/n8nio/n8n:stable
+    command: ["worker"]
+    depends_on:
+      db:
+        condition: healthy
+      redis:
+        condition: healthy
+    ports:
+      - 5678
+    resources: medium
+    health:
+      http: /healthz/readiness
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    env:
+      N8N_ENCRYPTION_KEY: ${secret:N8N_ENCRYPTION_KEY}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_RUNNERS_ENABLED: "true"
+      EXECUTIONS_MODE: queue
+      N8N_CONCURRENCY_PRODUCTION_LIMIT: "10"
+      QUEUE_HEALTH_CHECK_ACTIVE: "true"
+      QUEUE_HEALTH_CHECK_PORT: "5678"
+
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: ${db.host}
+      DB_POSTGRESDB_PORT: ${db.port}
+      DB_POSTGRESDB_DATABASE: ${db.database}
+      DB_POSTGRESDB_USER: ${db.user}
+      DB_POSTGRESDB_PASSWORD: ${db.password}
+      DB_POSTGRESDB_SCHEMA: public
+
+      QUEUE_BULL_REDIS_HOST: ${redis.host}
+      QUEUE_BULL_REDIS_PORT: ${redis.port}
+      QUEUE_BULL_REDIS_PASSWORD: ${redis.password}
+      QUEUE_BULL_REDIS_DB: "0"
+
+      GENERIC_TIMEZONE: UTC
+      TZ: UTC
       N8N_DIAGNOSTICS_ENABLED: "false"

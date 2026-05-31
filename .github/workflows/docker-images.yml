@@ -4,7 +4,11 @@ on:
   push:
     branches:
       - main
+    paths:
+      - meilisearch/ui/**
   pull_request:
+    paths:
+      - meilisearch/ui/**
   workflow_dispatch:
 
 permissions:
