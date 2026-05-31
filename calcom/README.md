@@ -19,8 +19,6 @@ Required secrets:
     - Hint: `hostess secrets set NEXTAUTH_SECRET --value "$(openssl rand -base64 32)"`
 - `CALENDSO_ENCRYPTION_KEY`
     - Hint: `hostess secrets set CALENDSO_ENCRYPTION_KEY --value "$(openssl rand -base64 32)"`
-- `EMAIL_FROM_NAME`
-- `EMAIL_FROM`
 - `EMAIL_SERVER_HOST`
 - `EMAIL_SERVER_PORT`
 - `EMAIL_SERVER_USER`
@@ -33,12 +31,10 @@ Use your SMTP provider values for the `EMAIL_*` secrets.
 For the lowest-friction real email experience, use Resend SMTP:
 
 ```sh
-hostess secrets set EMAIL_FROM_NAME --value "Cal.com"
-hostess secrets set EMAIL_FROM --value "cal@yourdomain.com"
-hostess secrets set EMAIL_SERVER_HOST --value "smtp.resend.com"
-hostess secrets set EMAIL_SERVER_PORT --value "465"
-hostess secrets set EMAIL_SERVER_USER --value "resend"
-hostess secrets set EMAIL_SERVER_PASSWORD --value "YOUR_RESEND_API_KEY"
+hostess secrets add EMAIL_SERVER_HOST --value "smtp.resend.com"
+hostess secrets add EMAIL_SERVER_PORT --value "465"
+hostess secrets add EMAIL_SERVER_USER --value "resend"
+hostess secrets add EMAIL_SERVER_PASSWORD --value "YOUR_RESEND_API_KEY"
 ```
 
 > **Note:** Resend requires a verified sending domain. Use the fixed username `resend` and your API key as the password.
@@ -48,10 +44,10 @@ hostess secrets set EMAIL_SERVER_PASSWORD --value "YOUR_RESEND_API_KEY"
 If you only need to smoke test email features, use Mailtrap Email Sandbox:
 
 ```sh
-hostess secrets set EMAIL_SERVER_HOST --value "sandbox.smtp.mailtrap.io"
-hostess secrets set EMAIL_SERVER_PORT --value "2525"
-hostess secrets set EMAIL_SERVER_USER --value "YOUR_MAILTRAP_SANDBOX_USERNAME"
-hostess secrets set EMAIL_SERVER_PASSWORD --value "YOUR_MAILTRAP_SANDBOX_PASSWORD"
+hostess secrets add EMAIL_SERVER_HOST --value "sandbox.smtp.mailtrap.io"
+hostess secrets add EMAIL_SERVER_PORT --value "2525"
+hostess secrets add EMAIL_SERVER_USER --value "YOUR_MAILTRAP_SANDBOX_USERNAME"
+hostess secrets add EMAIL_SERVER_PASSWORD --value "YOUR_MAILTRAP_SANDBOX_PASSWORD"
 ```
 
 Mailtrap sandbox emails are captured in Mailtrap and are **not** delivered to real recipients.
