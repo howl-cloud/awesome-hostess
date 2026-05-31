@@ -11,19 +11,12 @@ hostess deploy
 
 Required secrets:
 
-- `GARAGE_RPC_SECRET`
-    - Hint: `hostess secrets set GARAGE_RPC_SECRET --value "$(openssl rand -hex 32)"`
-- `GARAGE_ADMIN_TOKEN`
-    - Hint: `hostess secrets set GARAGE_ADMIN_TOKEN --value "$(openssl rand -base64 32)"`
-- `GARAGE_METRICS_TOKEN`
-    - Hint: `hostess secrets set GARAGE_METRICS_TOKEN --value "$(openssl rand -base64 32)"`
 - `FLOWISE_S3_ACCESS_KEY_ID`
     - Hint: `hostess secrets set FLOWISE_S3_ACCESS_KEY_ID --value "flowise"`
 - `FLOWISE_S3_SECRET_ACCESS_KEY`
     - Hint: `hostess secrets set FLOWISE_S3_SECRET_ACCESS_KEY --value "$(openssl rand -base64 32)"`
 - `FLOWISE_USERNAME`
 - `FLOWISE_PASSWORD`
-    - Hint: `hostess secrets set FLOWISE_PASSWORD --value "$(openssl rand -base64 18)"`
 - `FLOWISE_JWT_AUTH_TOKEN_SECRET`
     - Hint: `hostess secrets set FLOWISE_JWT_AUTH_TOKEN_SECRET --value "$(openssl rand -base64 32)"`
 - `FLOWISE_JWT_REFRESH_TOKEN_SECRET`
@@ -34,6 +27,8 @@ Required secrets:
     - Hint: `hostess secrets set FLOWISE_SECRET_KEY --value "$(openssl rand -base64 32)"`
 
 Use any login name you want for `FLOWISE_USERNAME`.
+
+Garage uses the checked-in `garage.toml` file mount with demo-only RPC, admin, and metrics tokens. Rotate those values before using this module for anything beyond a demo.
 
 ## Local Compose
 
