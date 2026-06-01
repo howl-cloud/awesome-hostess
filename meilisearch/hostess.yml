@@ -1,6 +1,6 @@
 version: "1.0"
 name: meilisearch
-description: Meilisearch search API with a basic user-facing search console.
+description: Meilisearch on Hostess
 
 services:
   meilisearch:

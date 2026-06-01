@@ -1,6 +1,6 @@
 version: "1.0"
 name: open-webui-llama
-description: CPU-only Open WebUI backed by llama.cpp serving Gemma 4 E2B GGUF.
+description: Gemma 4 E2B on Hostess
 
 services:
   db:
@@ -21,7 +21,6 @@ services:
       - 8080
     resources: xlarge
     command:
-      - /app/llama-server
       - --host
       - 0.0.0.0
       - --port
@@ -29,12 +28,8 @@ services:
       - --hf-repo
       - gguf-org/gemma-4-e2b-it-gguf:Q4_0
       - --no-mmproj
-      - --ctx-size
-      - "4096"
       - --parallel
       - "1"
-      - --n-predict
-      - "512"
     health:
       http: /health
       interval: 30s
@@ -63,7 +58,15 @@ services:
       PORT: "8080"
       WEBUI_URL: ${webui.external_url}
       WEBUI_SECRET_KEY: ${secret:WEBUI_SECRET_KEY}
+      WEBUI_AUTH: "false"
+      ENABLE_SIGNUP: "false"
+      OFFLINE_MODE: "true"
+      HF_HUB_OFFLINE: "1"
+      RAG_EMBEDDING_MODEL_AUTO_UPDATE: "false"
+      RAG_RERANKING_MODEL_AUTO_UPDATE: "false"
+      WHISPER_MODEL_AUTO_UPDATE: "false"
       DATA_DIR: /data/open-webui
+      HF_HOME: /data/huggingface
 
       DATABASE_URL: ${db.url}
 

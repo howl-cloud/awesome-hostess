@@ -18,7 +18,6 @@ services:
   llama:
     image: ghcr.io/ggml-org/llama.cpp:server
     command:
-      - /app/llama-server
       - --host
       - 0.0.0.0
       - --port
@@ -30,8 +29,6 @@ services:
       - "4096"
       - --parallel
       - "1"
-      - --n-predict
-      - "512"
     ports:
       - "${LLAMA_PORT:-8081}:8080"
     volumes:
@@ -59,6 +56,13 @@ services:
       PORT: "8080"
       WEBUI_URL: ${WEBUI_URL:-http://localhost:3000}
       WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-open-webui-local-secret}
+      WEBUI_AUTH: "false"
+      ENABLE_SIGNUP: "false"
+      OFFLINE_MODE: "true"
+      HF_HUB_OFFLINE: "1"
+      RAG_EMBEDDING_MODEL_AUTO_UPDATE: "false"
+      RAG_RERANKING_MODEL_AUTO_UPDATE: "false"
+      WHISPER_MODEL_AUTO_UPDATE: "false"
       DATA_DIR: /data/open-webui
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-openwebui}
       ENABLE_OLLAMA_API: "false"
