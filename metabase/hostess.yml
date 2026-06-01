@@ -7,8 +7,7 @@ services:
     type: postgres
     retention: permanent
     resources:
-      preset: medium
-      storage: 50Gi
+      preset: small
     backups:
       schedule: daily
       retention: 14
@@ -17,11 +16,14 @@ services:
     type: custom
     image: metabase/metabase:latest
     depends_on:
-      - db
+      db:
+        condition: healthy
+      seed-business-data:
+        condition: completed
     ports:
       - port: 3000
         public: true
-    resources: medium
+    resources: large
     health:
       http: /api/health
       interval: 15s
@@ -38,3 +40,61 @@ services:
       MB_SITE_URL: ${metabase.external_url}
       MB_ENCRYPTION_SECRET_KEY: ${secret:METABASE_ENCRYPTION_SECRET_KEY}
       MB_ADMIN_EMAIL: ${secret:METABASE_ADMIN_EMAIL}
+
+      JAVA_OPTS: "-Xmx1g"
+
+jobs:
+  seed-business-data:
+    image: postgres:17-alpine
+    depends_on:
+      db:
+        condition: healthy
+    run: once
+    timeout: 2m
+    resources: small
+    files:
+      - name: business-seed-sql
+        mount: /tmp/business-seed.sql
+        source: ./db/business-seed.sql
+    env:
+      PGHOST: ${db.host}
+      PGPORT: ${db.port}
+      PGDATABASE: ${db.database}
+      PGUSER: postgres
+      PGPASSWORD: ${db.password}
+    command:
+      - sh
+      - -c
+      - |
+        psql \
+          -v ON_ERROR_STOP=1 \
+          -f /tmp/business-seed.sql
+
+  register-business-db:
+    image: node:22-alpine
+    depends_on:
+      seed-business-data:
+        condition: completed
+      metabase:
+        condition: healthy
+    run: once
+    timeout: 5m
+    resources: small
+    files:
+      - name: register-metabase-db-script
+        mount: /tmp/register-metabase-db.mjs
+        source: ./scripts/register-metabase-db.mjs
+    env:
+      METABASE_URL: ${metabase.url}
+      METABASE_ADMIN_EMAIL: ${secret:METABASE_ADMIN_EMAIL}
+      METABASE_ADMIN_PASSWORD: ${secret:METABASE_ADMIN_PASSWORD}
+      METABASE_DATABASE_NAME: "Business Demo"
+      METABASE_SITE_NAME: "Hostess Metabase Demo"
+      METABASE_SCHEMA: business
+      PGHOST: ${db.host}
+      PGPORT: ${db.port}
+      PGDATABASE: ${db.database}
+      PGUSER: postgres
+      PGPASSWORD: ${db.password}
+    entrypoint: ["node"]
+    command: ["/tmp/register-metabase-db.mjs"]

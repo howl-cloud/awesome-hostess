@@ -20,6 +20,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      seed-business-data:
+        condition: service_completed_successfully
     ports:
       - "${METABASE_PORT:-3000}:3000"
     environment:
@@ -32,6 +34,52 @@ services:
       MB_SITE_URL: ${MB_SITE_URL:-http://localhost:3000}
       MB_ENCRYPTION_SECRET_KEY: ${METABASE_ENCRYPTION_SECRET_KEY:-0123456789abcdef0123456789abcdef}
       MB_ADMIN_EMAIL: ${METABASE_ADMIN_EMAIL:-admin@example.com}
+
+  seed-business-data:
+    image: postgres:17-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    volumes:
+      - ./db/business-seed.sql:/tmp/business-seed.sql:ro
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-metabase}
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    command:
+      - sh
+      - -c
+      - |
+        psql \
+          -v ON_ERROR_STOP=1 \
+          -f /tmp/business-seed.sql
+
+  register-business-db:
+    image: node:22-alpine
+    depends_on:
+      seed-business-data:
+        condition: service_completed_successfully
+      metabase:
+        condition: service_started
+    restart: "no"
+    volumes:
+      - ./scripts/register-metabase-db.mjs:/tmp/register-metabase-db.mjs:ro
+    environment:
+      METABASE_URL: http://metabase:3000
+      METABASE_ADMIN_EMAIL: ${METABASE_ADMIN_EMAIL:-admin@example.com}
+      METABASE_ADMIN_PASSWORD: ${METABASE_ADMIN_PASSWORD:-MetabaseLocalDemo2026}
+      METABASE_DATABASE_NAME: Business Demo
+      METABASE_SITE_NAME: Local Metabase Demo
+      METABASE_SCHEMA: business
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-metabase}
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    command: ["node", "/tmp/register-metabase-db.mjs"]
 
 volumes:
   db-data:
