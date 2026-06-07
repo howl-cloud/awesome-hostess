@@ -2,6 +2,12 @@
 
 This example runs n8n with Hostess-managed Postgres.
 
+Related Hostess docs:
+
+- [Deploy the n8n Stack](https://docs.hostess.sh/guides/n8n-stack)
+- [Managing Secrets](https://docs.hostess.sh/guides/managing-secrets)
+- [Postgres on Hostess](https://docs.hostess.sh/docs/service-types/postgres)
+
 ## Hostess
 
 ```sh

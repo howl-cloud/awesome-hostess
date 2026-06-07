@@ -26,6 +26,12 @@ Kong is the public service. Studio, Auth, REST, Storage, Realtime, and Functions
 
 Studio is protected with HTTP Basic Auth through Kong.
 
+Related Hostess docs:
+
+- [Deploy the Supabase Stack](https://docs.hostess.sh/guides/supabase-stack)
+- [Managing Secrets](https://docs.hostess.sh/guides/managing-secrets)
+- [Configuration Reference](https://docs.hostess.sh/docs/configuration)
+
 ## Current limitations
 
 This is closer to the upstream Supabase Docker stack, but it is not a full hosted-Supabase clone.

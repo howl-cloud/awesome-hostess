@@ -2,6 +2,12 @@
 
 This example runs Flowise with Hostess-managed Postgres and a Garage-backed S3 object store.
 
+Related Hostess docs:
+
+- [Configuration Reference](https://docs.hostess.sh/docs/configuration)
+- [Custom Services on Hostess](https://docs.hostess.sh/docs/service-types/custom)
+- [Managing Secrets](https://docs.hostess.sh/guides/managing-secrets)
+
 ## Hostess
 
 ```sh

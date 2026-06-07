@@ -2,6 +2,12 @@
 
 This example runs Metabase with Hostess-managed Postgres for the application database. Seed jobs also create a `business` schema with demo customers, products, orders, support tickets, and marketing campaigns, then register that schema as a Metabase data source.
 
+Related Hostess docs:
+
+- [Deploy the Metabase Stack](https://docs.hostess.sh/guides/metabase-stack)
+- [Managing Secrets](https://docs.hostess.sh/guides/managing-secrets)
+- [Postgres on Hostess](https://docs.hostess.sh/docs/service-types/postgres)
+
 ## Hostess
 
 ```sh

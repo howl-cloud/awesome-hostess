@@ -9,6 +9,13 @@ It includes:
 - `hostess.yml` - Hostess config for all three services
 - `docker-compose.yml` - local mirror for smoke testing
 
+Related Hostess docs:
+
+- [Deploy Next.js + FastAPI + Postgres](https://docs.hostess.sh/guides/nextjs-fastapi-postgres)
+- [Next.js on Hostess](https://docs.hostess.sh/docs/service-types/nextjs)
+- [FastAPI on Hostess](https://docs.hostess.sh/docs/service-types/fastapi)
+- [Postgres on Hostess](https://docs.hostess.sh/docs/service-types/postgres)
+
 ## Deploy with Hostess
 
 ```sh

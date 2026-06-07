@@ -4,6 +4,12 @@ This example runs Directus CMS/API with Hostess-managed Postgres and persistent 
 
 Directus stores uploaded files under `/data/uploads` in the Hostess custom service.
 
+Related Hostess docs:
+
+- [Configuration Reference](https://docs.hostess.sh/docs/configuration)
+- [Custom Services on Hostess](https://docs.hostess.sh/docs/service-types/custom)
+- [Managing Secrets](https://docs.hostess.sh/guides/managing-secrets)
+
 ## Hostess
 
 ```sh

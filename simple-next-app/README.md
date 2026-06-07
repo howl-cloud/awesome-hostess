@@ -2,6 +2,12 @@
 
 This is the example app used by the Hostess "Deploy Your First App" guide.
 
+Related Hostess docs:
+
+- [Deploy Your First App](https://docs.hostess.sh/guides/deploy-your-first-app)
+- [Next.js on Hostess](https://docs.hostess.sh/docs/service-types/nextjs)
+- [CLI deploy reference](https://docs.hostess.sh/docs/cli/deploy)
+
 ## Deploy with Hostess
 
 ```sh

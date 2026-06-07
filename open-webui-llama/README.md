@@ -6,6 +6,12 @@ The model server uses `gguf-org/gemma-4-e2b-it-gguf:Q4_0` through the `ghcr.io/g
 
 **If you want to use GPUs on Hostess, express interest in Hostess prioritizing GPU support!**
 
+Related Hostess docs:
+
+- [Deploy an Open LLM](https://docs.hostess.sh/guides/open-llm)
+- [Managing Secrets](https://docs.hostess.sh/guides/managing-secrets)
+- [Postgres on Hostess](https://docs.hostess.sh/docs/service-types/postgres)
+
 ## Hostess
 
 ```sh

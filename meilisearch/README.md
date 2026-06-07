@@ -4,6 +4,12 @@ This example runs Meilisearch with a small Next.js search console and a seed job
 
 The search engine uses the official `getmeili/meilisearch:v1.37` image. The UI is custom app code in `ui/`, published as `ghcr.io/howl-cloud/awesome-hostess/meilisearch-ui` for the Hostess config and built locally by the Compose mirror.
 
+Related Hostess docs:
+
+- [Deploy the Meilisearch Stack](https://docs.hostess.sh/guides/meilisearch-stack)
+- [Managing Secrets](https://docs.hostess.sh/guides/managing-secrets)
+- [Configuration Reference](https://docs.hostess.sh/docs/configuration)
+
 ## Hostess
 
 ```sh

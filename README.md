@@ -2,7 +2,7 @@
 
 Example stacks you can deploy with [Hostess](https://hostess.sh), the Docker Compose for production. Each directory is a self-contained module with a `hostess.yml` for deployment and a `docker-compose.yml` for local smoke testing.
 
-Read the [Hostess documentation](https://docs.hostess.sh) for more information.
+Read the [Hostess documentation](https://docs.hostess.sh/docs) for more information.
 
 ## Quick start
 
@@ -19,7 +19,7 @@ To run the same layout locally:
 docker compose up
 ```
 
-Most stacks require secrets (API keys, passwords, encryption keys). Each module's README lists what to set with `hostess secrets set`.
+Most stacks require secrets (API keys, passwords, encryption keys). Each module's README lists what to set with `hostess secrets set` [command](https://docs.hostess.sh/docs/cli/secrets).
 
 ## Stacks
 
@@ -27,21 +27,21 @@ Most stacks require secrets (API keys, passwords, encryption keys). Each module'
 
 | Stack | Description | Projects |
 | --- | --- | --- |
-| [simple-next-app](./simple-next-app/) | Minimal Next.js app from the [Deploy Your First App](https://docs.hostess.sh) guide | [Next.js](https://nextjs.org) |
-| [simple-full-stack](./simple-full-stack/) | Next.js frontend, FastAPI backend, and Postgres from the [Deploy Next.js + FastAPI + Postgres](https://docs.hostess.sh) guide | [Next.js](https://nextjs.org), [FastAPI](https://fastapi.tiangolo.com), [PostgreSQL](https://www.postgresql.org) |
+| [simple-next-app](./simple-next-app/) | Minimal Next.js app from the [Deploy Your First App](https://docs.hostess.sh/guides/deploy-your-first-app) guide | [Next.js](https://nextjs.org) |
+| [simple-full-stack](./simple-full-stack/) | Next.js frontend, FastAPI backend, and Postgres from the [Deploy Next.js + FastAPI + Postgres](https://docs.hostess.sh/guides/nextjs-fastapi-postgres) guide | [Next.js](https://nextjs.org), [FastAPI](https://fastapi.tiangolo.com), [PostgreSQL](https://www.postgresql.org) |
 
 ### Apps & platforms
 
 | Stack | Description | Projects |
 | --- | --- | --- |
-| [supabase](./supabase/) | Self-hosted Supabase | [Supabase](https://supabase.com) |
-| [metabase](./metabase/) | Metabase with Postgres | [Metabase](https://www.metabase.com) |
-| [calcom](./calcom/) | Calendar scheduling | [Cal.com](https://cal.com) |
-| [n8n](./n8n/) | Workflow automation | [n8n](https://n8n.io) |
+| [supabase](./supabase/) | Self-hosted Supabase from the [Supabase stack guide](https://docs.hostess.sh/guides/supabase-stack) | [Supabase](https://supabase.com) |
+| [metabase](./metabase/) | Metabase with Postgres from the [Metabase stack guide](https://docs.hostess.sh/guides/metabase-stack) | [Metabase](https://www.metabase.com) |
+| [calcom](./calcom/) | Calendar scheduling from the [Cal.com stack guide](https://docs.hostess.sh/guides/calcom-stack) | [Cal.com](https://cal.com) |
+| [n8n](./n8n/) | Workflow automation from the [n8n stack guide](https://docs.hostess.sh/guides/n8n-stack) | [n8n](https://n8n.io) |
 | [flowise](./flowise/) | Visual LLM workflow builder | [Flowise](https://flowiseai.com) |
 | [directus](./directus/) | Headless CMS and API | [Directus](https://directus.io) |
-| [meilisearch](./meilisearch/) | Meilisearch | [Meilisearch](https://www.meilisearch.com) |
-| [open-webui-llama](./open-webui-llama/) | Gemma 4 E2B on Hostess | [Open WebUI](https://openwebui.com), [llama.cpp](https://github.com/ggml-org/llama.cpp) |
+| [meilisearch](./meilisearch/) | Meilisearch from the [Meilisearch stack guide](https://docs.hostess.sh/guides/meilisearch-stack) | [Meilisearch](https://www.meilisearch.com) |
+| [open-webui-llama](./open-webui-llama/) | Gemma 4 E2B on Hostess from the [Open LLM guide](https://docs.hostess.sh/guides/open-llm) | [Open WebUI](https://openwebui.com), [llama.cpp](https://github.com/ggml-org/llama.cpp) |
 
 ## Layout
 

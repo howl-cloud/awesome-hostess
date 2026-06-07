@@ -6,6 +6,12 @@ The Hostess config uses the published `calcom/cal.com:v6.2.0` image and keeps
 the stack image-only. Cal.com's source-built v2 API service is intentionally
 not included.
 
+Related Hostess docs:
+
+- [Deploy the Cal.com Stack](https://docs.hostess.sh/guides/calcom-stack)
+- [Managing Secrets](https://docs.hostess.sh/guides/managing-secrets)
+- [Redis on Hostess](https://docs.hostess.sh/docs/service-types/redis)
+
 ## Hostess
 
 ```sh
