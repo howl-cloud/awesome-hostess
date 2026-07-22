@@ -268,4 +268,4 @@ unset owner_secret owner_nsec owner_keys relay_secret relay_keys
 
 ---
 
-Config reference: [`hostess.yml`](./hostess.yml) · Full schema: [hostess.sh/docs](https://hostess.sh/docs)
+Config reference: [`hostess.yml`](./hostess.yml) · Full docs: [docs.hostess.sh](https://docs.hostess.sh)
