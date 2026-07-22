@@ -60,8 +60,13 @@ services:
       ENABLE_SIGNUP: "false"
       OFFLINE_MODE: "true"
       HF_HUB_OFFLINE: "1"
+      RAG_EMBEDDING_ENGINE: openai
+      RAG_EMBEDDING_MODEL: unused
+      RAG_OPENAI_API_BASE_URL: http://llama:8080/v1
+      RAG_OPENAI_API_KEY: hostess-local-llama
       RAG_EMBEDDING_MODEL_AUTO_UPDATE: "false"
       RAG_RERANKING_MODEL_AUTO_UPDATE: "false"
+      BYPASS_EMBEDDING_AND_RETRIEVAL: "true"
       WHISPER_MODEL_AUTO_UPDATE: "false"
       DATA_DIR: /data/open-webui
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-openwebui}

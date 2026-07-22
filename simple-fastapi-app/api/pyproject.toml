@@ -1,0 +1,11 @@
+[project]
+name = "kickoff-sports-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.115",
+    "hostess-python[fastapi]",
+]
+
+[tool.uv.sources]
+hostess-python = { git = "https://github.com/howl-cloud/hostess-python.git" }

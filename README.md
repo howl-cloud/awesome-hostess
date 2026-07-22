@@ -28,6 +28,7 @@ Most stacks require secrets (API keys, passwords, encryption keys). Each module'
 | Stack | Description | Projects |
 | --- | --- | --- |
 | [simple-next-app](./simple-next-app/) | Minimal Next.js app from the [Deploy Your First App](https://docs.hostess.sh/guides/deploy-your-first-app) guide | [Next.js](https://nextjs.org) |
+| [simple-fastapi-app](./simple-fastapi-app/) | FastAPI product catalog with traffic generation from the [Deploy Your Second App](https://docs.hostess.sh/guides/deploy-your-second-app) guide | [FastAPI](https://fastapi.tiangolo.com) |
 | [simple-full-stack](./simple-full-stack/) | Next.js frontend, FastAPI backend, and Postgres from the [Deploy Next.js + FastAPI + Postgres](https://docs.hostess.sh/guides/nextjs-fastapi-postgres) guide | [Next.js](https://nextjs.org), [FastAPI](https://fastapi.tiangolo.com), [PostgreSQL](https://www.postgresql.org) |
 
 ### Apps & platforms
@@ -42,6 +43,7 @@ Most stacks require secrets (API keys, passwords, encryption keys). Each module'
 | [directus](./directus/) | Headless CMS and API | [Directus](https://directus.io) |
 | [meilisearch](./meilisearch/) | Meilisearch from the [Meilisearch stack guide](https://docs.hostess.sh/guides/meilisearch-stack) | [Meilisearch](https://www.meilisearch.com) |
 | [open-webui-llama](./open-webui-llama/) | Gemma 4 E2B on Hostess from the [Open LLM guide](https://docs.hostess.sh/guides/open-llm) | [Open WebUI](https://openwebui.com), [llama.cpp](https://github.com/ggml-org/llama.cpp) |
+| [buzz](./buzz/) | Block's open-source Slack alternative with Postgres, Redis, and MinIO | [Buzz](https://github.com/block/buzz) |
 
 ## Layout
 

@@ -1,0 +1,20 @@
+version: "1.0"
+name: simple-fastapi-app
+description: KickOff Sports product catalog API
+
+services:
+  api:
+    type: fastapi
+    source: ./api
+    public: true
+    resources: small
+
+  traffic:
+    type: fastapi
+    source: ./traffic
+    public: true
+    env:
+      API_URL: ${api.url}
+    depends_on:
+      - api
+    resources: small
